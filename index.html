@@ -229,7 +229,7 @@
                 <h3 id="news-modal-title" class="font-bold text-slate-800 text-lg">Tambah News</h3>
                 <button onclick="closeNewsModal()" class="text-slate-400 hover:text-slate-600 text-lg p-1">&times;</button>
             </div>
-            <form onsubmit="handleNewsSubmit(event)" class="p-6 space-y-4">
+            <form id="news-form" onsubmit="handleNewsSubmit(event)" class="p-6 space-y-4">
                 <input type="hidden" id="news-id">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Judul</label>
@@ -282,7 +282,7 @@
         </div>
     </div>
 
-    <!-- LOGIN MODAL (tidak diubah) -->
+    <!-- LOGIN MODAL -->
     <div id="login-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden p-6">
             <div class="flex justify-between items-center mb-4">
@@ -341,8 +341,9 @@
         }
         setInterval(tickClock, 1000);
 
-        // ================= AUTH (sama seperti sebelumnya) =================
+        // ================= AUTH =================
         function updateAuthUI() {
+            isAdmin = localStorage.getItem('iat_admin_logged') === 'true';
             const btnTambah = document.getElementById('btn-tambah');
             const btnNews = document.getElementById('btn-tambah-news');
             const authContainer = document.getElementById('admin-auth-container');
@@ -403,17 +404,17 @@
         }
 
         function escapeHTML(value) {
-            return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         }
         function escapeAttribute(value) {
-            return String(value).replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+            return String(value ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         }
 
         // ================= NEWS =================
         function setNewsFilter(f) { newsFilter = f; renderNews(); }
 
         function sortedNews() {
-            return [...news].sort((a, b) => String(b.date).localeCompare(String(a.date)) || Number(b.id) - Number(a.id));
+            return [...news].sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)));
         }
 
         function renderTicker() {
@@ -496,6 +497,7 @@
         }
 
         function openNewsModal(id) {
+            isAdmin = localStorage.getItem('iat_admin_logged') === 'true';
             if (!isAdmin) return showToast('Akses ditolak. Silakan login sebagai admin.');
             const n = id ? news.find(x => String(x.id) === String(id)) : null;
             document.getElementById('news-modal-title').innerText = n ? 'Edit News' : 'Tambah News';
@@ -505,14 +507,21 @@
             document.getElementById('news-date').value = n ? String(n.date).slice(0, 10) : todayStr();
             document.getElementById('news-content').value = n ? n.content : '';
             document.getElementById('news-author').value = n ? (n.author || '') : '';
-            document.getElementById('news-save-button').innerText = n ? 'Update' : 'Simpan';
+            
+            const btn = document.getElementById('news-save-button');
+            if (btn) btn.innerText = n ? 'Update' : 'Simpan';
+            
             document.getElementById('news-modal').classList.remove('hidden');
         }
         function closeNewsModal() { document.getElementById('news-modal').classList.add('hidden'); }
 
         async function handleNewsSubmit(event) {
             event.preventDefault();
-            if (!isAdmin) return;
+            isAdmin = localStorage.getItem('iat_admin_logged') === 'true';
+            if (!isAdmin) {
+                showToast('Akses ditolak. Silakan login sebagai admin.');
+                return;
+            }
             const id = document.getElementById('news-id').value;
             const item = {
                 id: id,
@@ -524,7 +533,7 @@
             };
             const btn = document.getElementById('news-save-button');
             try {
-                btn.disabled = true; btn.innerText = 'Menyimpan...';
+                if (btn) { btn.disabled = true; btn.innerText = 'Menyimpan...'; }
                 if (id) { await updateNewsToDatabase(item); showToast('News berhasil diperbarui!'); }
                 else { await addNewsToDatabase(item); showToast('News berhasil ditambahkan!'); }
                 news = await getNewsFromDatabase();
@@ -534,11 +543,12 @@
                 console.error('NEWS ERROR:', error);
                 showToast(error.message || 'Gagal menyimpan news.');
             } finally {
-                btn.disabled = false; btn.innerText = id ? 'Update' : 'Simpan';
+                if (btn) { btn.disabled = false; btn.innerText = id ? 'Update' : 'Simpan'; }
             }
         }
 
         async function deleteNews(id) {
+            isAdmin = localStorage.getItem('iat_admin_logged') === 'true';
             if (!isAdmin) return showToast('Akses ditolak.');
             if (!confirm('Hapus news ini?')) return;
             try {
@@ -604,8 +614,8 @@
 
                 const actionButtonsHTML = isAdmin ? `
                     <div class="flex space-x-1">
-                        <button onclick="openEditModal(${app.id})" title="Edit" class="text-slate-400 hover:text-sky-600 p-1.5"><i class="fa-solid fa-pen-to-square text-sm"></i></button>
-                        <button onclick="deleteApp(${app.id})" title="Hapus" class="text-slate-400 hover:text-rose-600 p-1.5"><i class="fa-solid fa-trash text-sm"></i></button>
+                        <button onclick="openEditModal('${escapeAttribute(app.id)}')" title="Edit" class="text-slate-400 hover:text-sky-600 p-1.5"><i class="fa-solid fa-pen-to-square text-sm"></i></button>
+                        <button onclick="deleteApp('${escapeAttribute(app.id)}')" title="Hapus" class="text-slate-400 hover:text-rose-600 p-1.5"><i class="fa-solid fa-trash text-sm"></i></button>
                     </div>` : `<span class="text-[11px] text-slate-400 mono">#${String(i + 1).padStart(2, '0')}</span>`;
 
                 card.innerHTML = `
@@ -630,6 +640,7 @@
         }
 
         function openModal() {
+            isAdmin = localStorage.getItem('iat_admin_logged') === 'true';
             if (!isAdmin) return showToast('Akses ditolak. Silakan login sebagai admin.');
             document.getElementById('modal-title').innerText = 'Tambah Web Baru';
             document.getElementById('app-id').value = '';
@@ -638,13 +649,17 @@
             document.getElementById('app-category').value = 'Manajemen';
             document.getElementById('app-icon').value = 'fa-chart-pie';
             document.getElementById('app-desc').value = '';
-            document.getElementById('save-button').innerText = 'Simpan';
+            
+            const saveBtn = document.getElementById('save-button');
+            if (saveBtn) saveBtn.innerText = 'Simpan';
+            
             document.getElementById('app-modal').classList.remove('hidden');
         }
 
         function openEditModal(id) {
+            isAdmin = localStorage.getItem('iat_admin_logged') === 'true';
             if (!isAdmin) return showToast('Akses ditolak.');
-            const app = apps.find(item => Number(item.id) === Number(id));
+            const app = apps.find(item => String(item.id) === String(id));
             if (!app) return showToast('Data web tidak ditemukan.');
             document.getElementById('modal-title').innerText = 'Edit Web';
             document.getElementById('app-id').value = app.id;
@@ -653,7 +668,10 @@
             document.getElementById('app-category').value = app.category || 'Lainnya';
             document.getElementById('app-icon').value = app.icon || 'fa-globe';
             document.getElementById('app-desc').value = app.desc || '';
-            document.getElementById('save-button').innerText = 'Update';
+            
+            const saveBtn = document.getElementById('save-button');
+            if (saveBtn) saveBtn.innerText = 'Update';
+            
             document.getElementById('app-modal').classList.remove('hidden');
         }
 
@@ -661,6 +679,7 @@
 
         async function handleFormSubmit(event) {
             event.preventDefault();
+            isAdmin = localStorage.getItem('iat_admin_logged') === 'true';
             if (!isAdmin) return;
             const id = document.getElementById('app-id').value;
             const app = {
@@ -674,7 +693,7 @@
             };
             const saveButton = document.getElementById('save-button');
             try {
-                saveButton.disabled = true; saveButton.innerText = 'Menyimpan...';
+                if (saveButton) { saveButton.disabled = true; saveButton.innerText = 'Menyimpan...'; }
                 if (id) { await updateAppToDatabase(app); showToast('Web berhasil diperbarui!'); }
                 else { await addAppToDatabase(app); showToast('Web berhasil ditambahkan!'); }
                 apps = await getAppsFromDatabase();
@@ -684,11 +703,12 @@
                 console.error('FORM ERROR:', error);
                 showToast(error.message || 'Gagal menyimpan data.');
             } finally {
-                saveButton.disabled = false; saveButton.innerText = id ? 'Update' : 'Simpan';
+                if (saveButton) { saveButton.disabled = false; saveButton.innerText = id ? 'Update' : 'Simpan'; }
             }
         }
 
         async function deleteApp(id) {
+            isAdmin = localStorage.getItem('iat_admin_logged') === 'true';
             if (!isAdmin) return showToast('Akses ditolak.');
             if (!confirm('Apakah Anda yakin ingin menghapus akses web ini dari portal?')) return;
             try {
@@ -731,9 +751,12 @@
         });
 
         ['app-modal', 'news-modal', 'news-read-modal', 'login-modal'].forEach(id => {
-            document.getElementById(id).addEventListener('click', function (e) {
-                if (e.target === this) this.classList.add('hidden');
-            });
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('click', function (e) {
+                    if (e.target === this) this.classList.add('hidden');
+                });
+            }
         });
     </script>
 </body>
