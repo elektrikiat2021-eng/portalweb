@@ -377,6 +377,7 @@
             if (pass === 'admin2026') {
                 isAdmin = true;
                 localStorage.setItem('iat_admin_logged', 'true');
+                localStorage.setItem('iat_admin_password', pass);
                 closeLoginModal();
                 updateAuthUI();
                 showToast('Berhasil masuk sebagai Admin!');
@@ -389,6 +390,7 @@
         function handleLogout() {
             isAdmin = false;
             localStorage.removeItem('iat_admin_logged');
+            localStorage.removeItem('iat_admin_password');
             updateAuthUI();
             showToast('Berhasil keluar dari mode Admin.');
         }
